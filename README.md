@@ -24,8 +24,8 @@ The output file contains the `streetcode` and `street` properties from
 `west_village_centerlines.geojson`, drawn from the closest centerline.  The
 closest centerline *does not* mean the proper street for that number, as the
 address point could be closer to a street it does not correspond to.  See "813
-Gansevoort St" (feature 0 in the output geojson) for an example of this; it
-should be 813 Washington St, but the Gansevoort centerline is in fact closer.
+Gansevoort St" in the output geojson for an example of this; it should be 813
+Washington St, but the Gansevoort centerline is in fact closer.
 
 ## How it works
 
@@ -65,8 +65,8 @@ minimal, we don't have to worry about maximizing efficiency.  A simple
 cross-join is done between the two tables, with the minimum distance between
 every point and every line calculated and added to each joined row.
 
-Next, we create a derivative table, with one entry for each point.  Along with
-this point, we pull out the minimum of all the distances to all the lines.
+Next, we create a derivative table, grouped with one row for each point.  This
+row contains minimum of all the distances to all the lines.
 
 Finally, we re-join the derivative table to the joined table, using the point
 and that minimum distance.  This lets us pull out the street name and
@@ -80,3 +80,17 @@ streetcode of the line with that minimum distance.
       -sql "select * from closest" 2>/dev/null
 
 We then export that final table as geojson, again using `ogr2ogr`.
+
+## How we could be more efficient
+
+If we were working with a scale of data where a cross-join was not practical,
+instead we could draw generous buffers around each point, and take advantage of
+a geographic index to join together the lines and points.
+
+Depending on the size of the buffer, the join would still likely hit several
+lines.  However, it would not hit every line, and would thus be much more
+efficient.
+
+We would still need to make a grouped table with the minimum distance, and
+re-join as we did in the process above.  The joined table would just be much
+smaller and faster to generate.
