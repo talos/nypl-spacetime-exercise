@@ -32,8 +32,51 @@ should be 813 Washington St, but the Gansevoort centerline is in fact closer.
 The process is coordinated in `./process.sh`, which spits out helpful messages
 about what it's doing.
 
+    export PGHOST=$(boot2docker ip || echo -n localhost)
+    export PGUSER=postgres
+    export PGPORT=54321
+    export PGDATABASE=postgres
+    export PGPASSWORD=docker4data
+
 First, a series of `export` statements tells our scripts where to find
 postgres.  As I'm using Docker4data, it lives in a docker container exposing
 port 54321.
 
-A Python script 
+    echo 'Importing addresses.json into postgres'
+    psql < schema.sql
+    python import.py
+
+Then, we pipe in `schema.sql` to create our schema for points.  We use Python
+to add our points into postgres, with lon/lat properly inserted as a `POINT`.
+
+    echo 'Importing west_village_centerlines.geojson into postgres'
+    ogr2ogr -overwrite -f PostgreSQL \
+      PG:"host=$PGHOST user=$PGUSER port=$PGPORT dbname=$PGDATABASE password=$PGPASSWORD" \
+      west_village_centerlines.geojson -nln west_village_centerlines
+
+Next, we use `ogr2ogr` to import the `west_village_centerlines.geojson` into
+Postgres.
+
+    echo 'Joining west_village_centerlines to addresses'
+    psql < join.sql
+
+Now we can join the two tables.  Since the number of records being joined is
+minimal, we don't have to worry about maximizing efficiency.  A simple
+cross-join is done between the two tables, with the minimum distance between
+every point and every line calculated and added to each joined row.
+
+Next, we create a derivative table, with one entry for each point.  Along with
+this point, we pull out the minimum of all the distances to all the lines.
+
+Finally, we re-join the derivative table to the joined table, using the point
+and that minimum distance.  This lets us pull out the street name and
+streetcode of the line with that minimum distance.
+
+    echo 'Exporting joined data as closest.geojson'
+    rm -f closest.geojson
+    ogr2ogr -overwrite -f geojson closest.geojson \
+      PG:"host=$PGHOST user=$PGUSER port=$PGPORT dbname=$PGDATABASE password=$PGPASSWORD" \
+      -geomfield point \
+      -sql "select * from closest" 2>/dev/null
+
+We then export that final table as geojson, again using `ogr2ogr`.
