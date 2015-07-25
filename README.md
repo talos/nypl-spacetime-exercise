@@ -2,7 +2,7 @@
 
 tl;dr
 
-[https://raw.githubusercontent.com/talos/nypl-spacetime-exercise/master/closest.geojson][]
+[https://raw.githubusercontent.com/talos/nypl-spacetime-exercise/master/closest.geojson](https://raw.githubusercontent.com/talos/nypl-spacetime-exercise/master/closest.geojson)
 
 ## Prerequisites
 
